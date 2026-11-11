@@ -1,1 +1,1 @@
-# pizzeria-apiprueba
+# pizzeria-api
