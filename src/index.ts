@@ -1,20 +1,7 @@
-import { Hono } from 'hono'
+import { createApp } from './app'
+import { D1MenuRepository } from './data/d1-menu-repository'
 
-// Variables que Cloudflare le pasa al Worker (vienen de wrangler.jsonc)
-type Bindings = {
-  ENVIRONMENT: string
-  VERSION: string
-  DB: D1Database
-}
-
-const app = new Hono<{ Bindings: Bindings }>()
-
-app.get('/health', (c) =>
-  c.json({
-    status: 'ok',
-    version: c.env.VERSION,
-    environment: c.env.ENVIRONMENT,
-  })
-)
-
-export default app
+// Punto de entrada del Worker: conecta la app con D1
+export default createApp((env) => ({
+  menu: new D1MenuRepository(env.DB),
+}))
