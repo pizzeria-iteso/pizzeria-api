@@ -118,6 +118,16 @@ describe('POST /orders', () => {
     expect(res.status).toBe(400)
     expect((await res.json()).error.code).toBe('PEDIDO_INVALIDO')
   })
+
+  it.each([
+    ['una pizza null', { pizzas: [null] }],
+    ['toppingIds que no es arreglo', { pizzas: [{ sizeId: 'chica', crustId: 'delgada', toppingIds: 5 }] }],
+  ])('responde 400 PIZZA_INVALIDA con %s', async (_caso, body) => {
+    const res = await crearPedido(body)
+
+    expect(res.status).toBe(400)
+    expect((await res.json()).error.code).toBe('PIZZA_INVALIDA')
+  })
 })
 
 describe('GET /orders/:id', () => {
