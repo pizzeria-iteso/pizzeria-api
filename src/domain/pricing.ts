@@ -3,6 +3,8 @@
 // Todos los precios están en centavos (16900 = $169.00).
 
 export const MAX_INGREDIENTES = 5
+export const MAX_CANTIDAD_POR_PIZZA = 20
+export const MAX_PIZZAS_POR_PEDIDO = 10
 
 export type MenuItem = {
   id: string
@@ -98,6 +100,12 @@ export function pricePizza(menu: Menu, pizza: PizzaRequest): PricedPizza {
   if (!Number.isInteger(quantity) || quantity < 1) {
     throw new PizzaValidationError('CANTIDAD_INVALIDA', 'La cantidad debe ser un número entero mayor que 0')
   }
+  if (quantity > MAX_CANTIDAD_POR_PIZZA) {
+    throw new PizzaValidationError(
+      'CANTIDAD_EXCEDIDA',
+      `Máximo ${MAX_CANTIDAD_POR_PIZZA} unidades de la misma pizza (se recibieron ${quantity})`
+    )
+  }
 
   const unitPriceCents = size.priceCents + crust.priceCents + toppingsCents
 
@@ -115,7 +123,12 @@ export function priceOrder(menu: Menu, pizzas: PizzaRequest[]): PricedOrder {
   if (!Array.isArray(pizzas) || pizzas.length === 0) {
     throw new PizzaValidationError('PEDIDO_VACIO', 'El pedido debe tener al menos una pizza')
   }
-
+  if (pizzas.length > MAX_PIZZAS_POR_PEDIDO) {
+    throw new PizzaValidationError(
+      'DEMASIADAS_PIZZAS',
+      `Máximo ${MAX_PIZZAS_POR_PEDIDO} pizzas por pedido (se recibieron ${pizzas.length})`
+    )
+  }
   const items = pizzas.map((pizza) => pricePizza(menu, pizza))
   const totalCents = items.reduce((sum, item) => sum + item.subtotalCents, 0)
 

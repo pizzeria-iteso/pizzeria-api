@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
+  MAX_CANTIDAD_POR_PIZZA,
   MAX_INGREDIENTES,
+  MAX_PIZZAS_POR_PEDIDO,
   PizzaValidationError,
   priceOrder,
   pricePizza,
@@ -77,6 +79,11 @@ describe('pricePizza: casos válidos', () => {
     // 12900 + 0 + 2500 + 2000 + 1800 + 1500 + 1200
     expect(pizza.unitPriceCents).toBe(21900)
   })
+
+  it(`acepta una cantidad de ${MAX_CANTIDAD_POR_PIZZA}`, () => {
+    const pizza = pricePizza(menu, { sizeId: 'chica', crustId: 'delgada', quantity: MAX_CANTIDAD_POR_PIZZA })
+    expect(pizza.subtotalCents).toBe(12900 * MAX_CANTIDAD_POR_PIZZA)
+  })
 })
 
 describe('pricePizza: casos inválidos', () => {
@@ -131,6 +138,14 @@ describe('pricePizza: casos inválidos', () => {
       'CANTIDAD_INVALIDA'
     )
   })
+
+  it(`rechaza una cantidad mayor a ${MAX_CANTIDAD_POR_PIZZA}`, () => {
+    expect(
+      codigoDeError(() =>
+        pricePizza(menu, { sizeId: 'chica', crustId: 'delgada', quantity: MAX_CANTIDAD_POR_PIZZA + 1 })
+      )
+    ).toBe('CANTIDAD_EXCEDIDA')
+  })
 })
 
 describe('priceOrder', () => {
@@ -156,5 +171,15 @@ describe('priceOrder', () => {
         ])
       )
     ).toBe('TAMANO_REQUERIDO')
+  })
+
+  it(`acepta ${MAX_PIZZAS_POR_PEDIDO} pizzas en un pedido`, () => {
+    const pizzas = Array.from({ length: MAX_PIZZAS_POR_PEDIDO }, () => ({ sizeId: 'chica', crustId: 'delgada' }))
+    expect(priceOrder(menu, pizzas).items).toHaveLength(MAX_PIZZAS_POR_PEDIDO)
+  })
+
+  it(`rechaza más de ${MAX_PIZZAS_POR_PEDIDO} pizzas en un pedido`, () => {
+    const pizzas = Array.from({ length: MAX_PIZZAS_POR_PEDIDO + 1 }, () => ({ sizeId: 'chica', crustId: 'delgada' }))
+    expect(codigoDeError(() => priceOrder(menu, pizzas))).toBe('DEMASIADAS_PIZZAS')
   })
 })
