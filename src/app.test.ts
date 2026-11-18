@@ -149,3 +149,52 @@ describe('GET /orders/:id', () => {
     expect((await res.json()).error.code).toBe('PEDIDO_NO_ENCONTRADO')
   })
 })
+
+describe('CORS', () => {
+  const envConCors = {
+    ENVIRONMENT: 'test',
+    VERSION: '1.2.3',
+    ALLOWED_ORIGINS: 'http://localhost:5173, https://ejemplo.pages.dev',
+  } as Bindings
+
+  it('da permiso a un origen de la lista', async () => {
+    const res = await app.request('/menu', { headers: { Origin: 'http://localhost:5173' } }, envConCors)
+
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173')
+  })
+
+  it('no da permiso a un origen fuera de la lista', async () => {
+    const res = await app.request('/menu', { headers: { Origin: 'https://sitio-ajeno.com' } }, envConCors)
+
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBeNull()
+  })
+
+  it('responde la verificación previa (preflight) de POST /orders', async () => {
+    const res = await app.request(
+      '/orders',
+      {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'https://ejemplo.pages.dev',
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'Content-Type',
+        },
+      },
+      envConCors
+    )
+
+    expect(res.status).toBe(204)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://ejemplo.pages.dev')
+  })
+
+  it('también da permiso en las respuestas de error', async () => {
+    const res = await app.request(
+      '/orders',
+      { method: 'POST', headers: { Origin: 'http://localhost:5173', 'Content-Type': 'application/json' }, body: '{}' },
+      envConCors
+    )
+
+    expect(res.status).toBe(400)
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173')
+  })
+})

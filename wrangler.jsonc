@@ -6,9 +6,12 @@
 	"observability": {
 		"enabled": true
 	},
+
+	// Configuración para correr en tu compu (npm run dev)
 	"vars": {
 		"ENVIRONMENT": "local",
-		"VERSION": "0.0.1"
+		"VERSION": "0.0.1",
+		"ALLOWED_ORIGINS": "http://localhost:5173"
 	},
 	"d1_databases": [
 		{
@@ -16,5 +19,38 @@
 			"database_name": "pizzeria-db-dev",
 			"database_id": "8e3f886c-ec17-4215-bfa2-a4d04deb1de2"
 		}
-	]
+	],
+
+	// Ambientes en Cloudflare. "vars" y "d1_databases" no se heredan:
+	// se repiten en cada ambiente.
+	"env": {
+		"dev": {
+			"vars": {
+				"ENVIRONMENT": "dev",
+				"VERSION": "0.0.1",
+				"ALLOWED_ORIGINS": "http://localhost:5173"
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "pizzeria-db-dev",
+					"database_id": "8e3f886c-ec17-4215-bfa2-a4d04deb1de2"
+				}
+			]
+		},
+		"prod": {
+			"vars": {
+				"ENVIRONMENT": "prod",
+				"VERSION": "0.0.1",
+				"ALLOWED_ORIGINS": ""
+			},
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "pizzeria-db-prod",
+					"database_id": "7d7a4a10-2d64-4f70-92a7-d6f7b8e287c4"
+				}
+			]
+		}
+	}
 }
