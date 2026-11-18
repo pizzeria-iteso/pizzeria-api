@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { cors } from 'hono/cors'
 import { MAX_INGREDIENTES, PizzaValidationError, priceOrder, type PizzaRequest } from './domain/pricing'
 import type { MenuRepository } from './data/menu-repository'
 import type { OrderRepository } from './data/order-repository'
@@ -7,6 +8,7 @@ import type { OrderRepository } from './data/order-repository'
 export type Bindings = {
   ENVIRONMENT: string
   VERSION: string
+  ALLOWED_ORIGINS: string
   DB: D1Database
 }
 
@@ -38,8 +40,25 @@ function readPizzas(body: unknown): PizzaRequest[] {
   return body.pizzas as PizzaRequest[]
 }
 
+// Orígenes (páginas web) que pueden llamar a la API desde el navegador.
+// Vienen de wrangler.jsonc, separados por comas.
+function allowedOrigins(env: Bindings): string[] {
+  return (env.ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0)
+}
+
 export function createApp(getRepositories: (env: Bindings) => Repositories) {
   const app = new Hono<{ Bindings: Bindings }>()
+
+  // CORS: solo los orígenes de la lista reciben permiso del navegador
+  app.use(
+    '*',
+    cors({
+      origin: (origin, c) => (allowedOrigins(c.env).includes(origin) ? origin : null),
+    })
+  )
 
   // Manejo central de errores (aquí se conectará Sentry en el Bloque 7)
   app.onError((err, c) => {
