@@ -151,3 +151,9 @@ vite.config.ts.timestamp-*
 # Wrangler
 .wrangler/
 .dev.vars*
+
+# Base SQLite local (Docker / Node)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

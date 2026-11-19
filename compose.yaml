@@ -1,0 +1,20 @@
+services:
+  api:
+    build: .
+    image: pizzeria-api:local
+    ports:
+      - "8787:8787"
+    environment:
+      ENVIRONMENT: docker
+      VERSION: local
+      ALLOWED_ORIGINS: http://localhost:5173
+    volumes:
+      - datos:/data # la base SQLite sobrevive aunque se borre el contenedor
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8787/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  datos:
