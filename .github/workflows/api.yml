@@ -1,0 +1,169 @@
+# Pipeline de la API
+# - En cada PR a main: pruebas unitarias (con reporte) y build del Worker.
+# - En cada merge a main: lo anterior + deploy a dev + deploy a prod (espera aprobación).
+name: API
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# En un PR, si llega un commit nuevo se cancela la ejecución anterior.
+# En main nunca se cancela, para no dejar un deploy a medias.
+concurrency:
+  group: api-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pruebas:
+    name: Pruebas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v6
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Pruebas unitarias
+        run: npx vitest run --reporter=default --reporter=junit --outputFile.junit=reporte/pruebas.xml
+
+      - name: Resumen de pruebas
+        if: always()
+        run: node scripts/resumen-pruebas.mjs reporte/pruebas.xml >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Guardar reporte de pruebas
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reporte-pruebas
+          path: reporte/pruebas.xml
+          if-no-files-found: warn
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v6
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      # Empaqueta el Worker igual que en un deploy, pero sin publicar nada
+      - name: Empaquetar el Worker
+        run: npx wrangler deploy --dry-run --outdir dist --env prod
+
+      - name: Guardar el paquete
+        uses: actions/upload-artifact@v6
+        with:
+          name: worker
+          path: dist/
+
+  deploy-dev:
+    name: Deploy a dev
+    if: github.event_name == 'push'
+    needs: [pruebas, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://pizzeria-api-dev.jonathan-arranaga.workers.dev/health
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      URL_API: https://pizzeria-api-dev.jonathan-arranaga.workers.dev
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v6
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Migraciones de D1 (dev)
+        run: npx wrangler d1 migrations apply pizzeria-db-dev --env dev --remote
+
+      # VERSION = primeros 7 caracteres del commit, para seguir el cambio de dev a prod
+      - name: Publicar el Worker (dev)
+        run: npx wrangler deploy --env dev --var "VERSION:${GITHUB_SHA::7}"
+
+      - name: Comprobar que responde
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors "$URL_API/health" | tee health.json
+          {
+            echo "## 🚀 API publicada en dev"
+            echo ""
+            echo "$URL_API/health"
+            echo ""
+            echo '```json'
+            cat health.json
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy-prod:
+    name: Deploy a prod
+    if: github.event_name == 'push'
+    needs: deploy-dev
+    runs-on: ubuntu-latest
+    # El ambiente prod pide aprobación de un reviewer antes de correr este trabajo
+    environment:
+      name: prod
+      url: https://pizzeria-api-prod.jonathan-arranaga.workers.dev/health
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      URL_API: https://pizzeria-api-prod.jonathan-arranaga.workers.dev
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v6
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Migraciones de D1 (prod)
+        run: npx wrangler d1 migrations apply pizzeria-db-prod --env prod --remote
+
+      - name: Publicar el Worker (prod)
+        run: npx wrangler deploy --env prod --var "VERSION:${GITHUB_SHA::7}"
+
+      - name: Comprobar que responde
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --retry-all-errors "$URL_API/health" | tee health.json
+          {
+            echo "## 🚀 API publicada en prod"
+            echo ""
+            echo "$URL_API/health"
+            echo ""
+            echo '```json'
+            cat health.json
+            echo ""
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
