@@ -6,7 +6,6 @@ services:
       - "8787:8787"
     environment:
       ENVIRONMENT: docker
-      VERSION: local
       ALLOWED_ORIGINS: http://localhost:5173
     volumes:
       - datos:/data # la base SQLite sobrevive aunque se borre el contenedor

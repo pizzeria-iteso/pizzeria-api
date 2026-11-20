@@ -1,0 +1,46 @@
+name: Docker Hub
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  imagen:
+    name: Construir y publicar imagen
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v5
+
+      - name: Calcular la versión (SHA corto del commit)
+        id: version
+        run: echo "sha=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Preparar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Solo en main: en los PRs no hace falta iniciar sesión porque no se publica
+      - name: Iniciar sesión en Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ vars.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir la imagen (y publicarla si es main)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name == 'push' }}
+          build-args: |
+            VERSION=${{ steps.version.outputs.sha }}
+          tags: |
+            ${{ vars.DOCKERHUB_USERNAME }}/pizzeria-api:${{ steps.version.outputs.sha }}
+            ${{ vars.DOCKERHUB_USERNAME }}/pizzeria-api:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

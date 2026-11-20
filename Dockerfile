@@ -14,8 +14,13 @@ RUN npm run build:node
 FROM node:24-alpine
 WORKDIR /app
 
+# Versión de la imagen (el pipeline pasa el SHA corto del commit)
+ARG VERSION=local
+LABEL org.opencontainers.image.source="https://github.com/pizzeria-iteso/pizzeria-api"
+
 ENV NODE_ENV=production \
     PORT=8787 \
+    VERSION=$VERSION \
     DB_PATH=/data/pizzeria.db \
     MIGRATIONS_DIR=/app/migrations
 
