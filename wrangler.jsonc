@@ -28,7 +28,7 @@
 			"vars": {
 				"ENVIRONMENT": "dev",
 				"VERSION": "0.0.1",
-				"ALLOWED_ORIGINS": "http://localhost:5173"
+				"ALLOWED_ORIGINS": "http://localhost:5173, https://pizzeria-web-dev.pages.dev"
 			},
 			"d1_databases": [
 				{
@@ -42,7 +42,7 @@
 			"vars": {
 				"ENVIRONMENT": "prod",
 				"VERSION": "0.0.1",
-				"ALLOWED_ORIGINS": ""
+				"ALLOWED_ORIGINS": "https://pizzeria-web-prod.pages.dev"
 			},
 			"d1_databases": [
 				{
