@@ -44,6 +44,8 @@ export type PricedOrder = {
 // Error controlado: pedido inválido por culpa del cliente (la API responderá 400).
 export class PizzaValidationError extends Error {
   readonly code: string
+  // Le dice a Sentry que es un error del cliente (4xx) y no una falla del servidor
+  readonly status = 400
 
   constructor(code: string, message: string) {
     super(message)

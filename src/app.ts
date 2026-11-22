@@ -4,11 +4,12 @@ import { MAX_INGREDIENTES, PizzaValidationError, priceOrder, type PizzaRequest }
 import type { MenuRepository } from './data/menu-repository'
 import type { OrderRepository } from './data/order-repository'
 
-// Variables y recursos que Cloudflare le pasa al Worker (vienen de wrangler.jsonc)
+// Variables y recursos que Cloudflare le pasa al Worker (vienen de wrangler.jsonc y de los secretos)
 export type Bindings = {
   ENVIRONMENT: string
   VERSION: string
   ALLOWED_ORIGINS: string
+  SENTRY_DSN?: string
   DB: D1Database
 }
 
@@ -16,6 +17,19 @@ export type Bindings = {
 export type Repositories = {
   menu: MenuRepository
   orders: OrderRepository
+}
+
+export type App = Hono<{ Bindings: Bindings }>
+
+// Ganchos opcionales de observabilidad. En el Worker se conectan a Sentry;
+// en Docker (Node) y en las pruebas no se pasan, y la app funciona igual.
+export type Observabilidad = {
+  // Se llama apenas se crea la app, antes de CORS y de las rutas
+  instrumentar?: (app: App) => void
+  // Errores controlados (400): Sentry no captura solo los 4xx
+  errorControlado?: (error: PizzaValidationError) => void
+  // Cada pedido creado, para tener un mensaje reconocible en Sentry
+  pedidoCreado?: (pedido: { id: string; totalCents: number; pizzas: number }) => void
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
@@ -49,8 +63,14 @@ function allowedOrigins(env: Bindings): string[] {
     .filter((origin) => origin.length > 0)
 }
 
-export function createApp(getRepositories: (env: Bindings) => Repositories) {
-  const app = new Hono<{ Bindings: Bindings }>()
+export function createApp(
+  getRepositories: (env: Bindings) => Repositories,
+  observabilidad: Observabilidad = {}
+) {
+  const app: App = new Hono<{ Bindings: Bindings }>()
+
+  // Sentry (u otra herramienta) se conecta antes que todo lo demás
+  observabilidad.instrumentar?.(app)
 
   // CORS: solo los orígenes de la lista reciben permiso del navegador
   app.use(
@@ -60,11 +80,13 @@ export function createApp(getRepositories: (env: Bindings) => Repositories) {
     })
   )
 
-  // Manejo central de errores (aquí se conectará Sentry en el Bloque 7)
+  // Manejo central de errores
   app.onError((err, c) => {
     if (err instanceof PizzaValidationError) {
+      observabilidad.errorControlado?.(err)
       return c.json({ error: { code: err.code, message: err.message } }, 400)
     }
+    // Los errores inesperados (500) los captura Sentry automáticamente
     console.error(err)
     return c.json({ error: { code: 'ERROR_INTERNO', message: 'Ocurrió un error inesperado' } }, 500)
   })
@@ -99,6 +121,7 @@ export function createApp(getRepositories: (env: Bindings) => Repositories) {
 
     const id = crypto.randomUUID()
     await orders.save(id, priced)
+    observabilidad.pedidoCreado?.({ id, totalCents: priced.totalCents, pizzas: priced.items.length })
 
     const order = await orders.findById(id)
     return c.json(order, 201)
