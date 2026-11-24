@@ -198,3 +198,46 @@ describe('CORS', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:5173')
   })
 })
+
+describe('GET /health', () => {
+  it('responde ok con la versión y el ambiente', async () => {
+    const res = await app.request('/health', {}, env)
+
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'ok', version: '1.2.3', environment: 'test' })
+  })
+})
+
+describe('Observabilidad (ganchos para Sentry)', () => {
+  it('avisa los pedidos creados y los errores controlados', async () => {
+    const pedidos: number[] = []
+    const errores: string[] = []
+    const appObservada = createApp(() => ({ menu: repoMenuFalso, orders: crearRepoPedidosEnMemoria() }), {
+      pedidoCreado: (pedido) => pedidos.push(pedido.totalCents),
+      errorControlado: (error) => errores.push(error.code),
+    })
+    const pedir = (body: unknown) =>
+      appObservada.request(
+        '/orders',
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+        env
+      )
+
+    await pedir({ pizzas: [{ sizeId: 'chica', crustId: 'delgada' }] }) // válido
+    await pedir({ pizzas: [{ crustId: 'delgada' }] }) // sin tamaño
+
+    expect(pedidos).toEqual([12900])
+    expect(errores).toEqual(['TAMANO_REQUERIDO'])
+  })
+
+  it('llama a instrumentar al crear la app', () => {
+    let llamado = false
+    createApp(() => ({ menu: repoMenuFalso, orders: crearRepoPedidosEnMemoria() }), {
+      instrumentar: () => {
+        llamado = true
+      },
+    })
+
+    expect(llamado).toBe(true)
+  })
+})

@@ -25,6 +25,8 @@
   "homepage": "https://github.com/pizzeria-iteso/pizzeria-api#readme",
   "dependencies": {
     "@hono/node-server": "^2.1.9",
+    "@sentry/cloudflare": "^11.16.0",
+    "@sentry/hono": "^11.16.0",
     "hono": "^4.13.18"
   },
   "devDependencies": {
