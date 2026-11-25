@@ -1,8 +1,10 @@
 // Convierte el reporte JUnit de Vitest en una tabla Markdown para el resumen del pipeline.
-// Uso: node scripts/resumen-pruebas.mjs reporte/pruebas.xml >> "$GITHUB_STEP_SUMMARY"
+// Si se le pasa el resumen de cobertura (json-summary de Vitest), agrega también la tabla de cobertura.
+// Uso: node scripts/resumen-pruebas.mjs reporte/pruebas.xml reporte/cobertura/coverage-summary.json >> "$GITHUB_STEP_SUMMARY"
 import { existsSync, readFileSync } from 'node:fs'
 
 const ruta = process.argv[2] ?? 'reporte/pruebas.xml'
+const rutaCobertura = process.argv[3]
 
 if (!existsSync(ruta)) {
   console.log('## 🧪 Pruebas unitarias\n\n⚠️ No se generó el reporte de pruebas.')
@@ -42,3 +44,31 @@ console.log(`## 🧪 Pruebas unitarias: ${totales.fallidas ? '❌ hay pruebas qu
 |---|---|---|---|---|
 ${filas.join('\n')}
 `)
+
+// ---------- Cobertura ----------
+if (rutaCobertura) {
+  if (!existsSync(rutaCobertura)) {
+    console.log('## 📊 Cobertura\n\n⚠️ No se generó el reporte de cobertura.')
+  } else {
+    const resumen = JSON.parse(readFileSync(rutaCobertura, 'utf8'))
+    const pct = (m) => `${m.pct}%`
+    const icono = (m) => (m.pct >= 80 ? '✅' : '❌')
+    const raiz = process.cwd() + '/'
+    const lineas = Object.entries(resumen)
+      .filter(([archivo]) => archivo !== 'total')
+      .map(([archivo, m]) => `| ${icono(m.lines)} | \`${archivo.replace(raiz, '')}\` | ${pct(m.statements)} | ${pct(m.branches)} | ${pct(m.functions)} | ${pct(m.lines)} |`)
+    const t = resumen.total
+    console.log(`## 📊 Cobertura: ${pct(t.lines)} de líneas
+
+| Statements | Branches | Functions | Lines |
+|---|---|---|---|
+| **${pct(t.statements)}** | **${pct(t.branches)}** | **${pct(t.functions)}** | **${pct(t.lines)}** |
+
+Mínimo requerido (total del proyecto): 80% en cada métrica. Si baja, el pipeline falla.
+
+| | Archivo | Statements | Branches | Functions | Lines |
+|---|---|---|---|---|---|
+${lineas.join('\n')}
+`)
+  }
+}
