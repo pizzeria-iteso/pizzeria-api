@@ -1,5 +1,5 @@
 # Pipeline de la API
-# - En cada PR a main: pruebas unitarias (con reporte) y build del Worker.
+# - En cada PR a main: pruebas unitarias (con reporte y cobertura) y build del Worker.
 # - En cada merge a main: lo anterior + deploy a dev + deploy a prod (espera aprobación).
 name: API
 
@@ -35,12 +35,13 @@ jobs:
       - name: Instalar dependencias
         run: npm ci
 
-      - name: Pruebas unitarias
-        run: npx vitest run --reporter=default --reporter=junit --outputFile.junit=reporte/pruebas.xml
+      # --coverage mide la cobertura; falla si baja de los mínimos de vitest.config.ts
+      - name: Pruebas unitarias y cobertura
+        run: npx vitest run --coverage --reporter=default --reporter=junit --outputFile.junit=reporte/pruebas.xml
 
-      - name: Resumen de pruebas
+      - name: Resumen de pruebas y cobertura
         if: always()
-        run: node scripts/resumen-pruebas.mjs reporte/pruebas.xml >> "$GITHUB_STEP_SUMMARY"
+        run: node scripts/resumen-pruebas.mjs reporte/pruebas.xml reporte/cobertura/coverage-summary.json >> "$GITHUB_STEP_SUMMARY"
 
       - name: Guardar reporte de pruebas
         if: always()
@@ -48,6 +49,15 @@ jobs:
         with:
           name: reporte-pruebas
           path: reporte/pruebas.xml
+          if-no-files-found: warn
+
+      # Reporte HTML: abrir index.html para ver línea por línea qué cubren las pruebas
+      - name: Guardar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: reporte-cobertura
+          path: reporte/cobertura/
           if-no-files-found: warn
 
   build:
